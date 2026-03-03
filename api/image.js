@@ -50,8 +50,9 @@ export default async function handler(req, res) {
 
       // 上传到 Vercel Blob（使用默认访问权限）
       const blob = await put('surprise-image.jpg', buffer, {
-        addRandomSuffix: false,
-      });
+       access: 'public',
+       addRandomSuffix: false,
+    });
 
       // 返回 Blob URL
       res.status(200).json({ success: true, url: blob.url });
