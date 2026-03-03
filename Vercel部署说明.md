@@ -1,4 +1,4 @@
-# Vercel 部署说明
+# Vercel 部署说明（使用 Blob 存储）
 
 ## 🚀 快速部署到 Vercel
 
@@ -12,26 +12,27 @@
    ```
 
 2. **导入到 Vercel**
+
    - 访问 [vercel.com](https://vercel.com)
    - 点击 "New Project"
    - 选择您的 GitHub 仓库
    - 点击 "Import"
 
-3. **配置环境变量**
+3. **配置 Vercel Blob 存储**
+
+   - 在 Vercel 项目页面，点击 "Storage" 标签
+   - 点击 "Create Database"
+   - 选择 "Blob" (文件存储)
+   - 输入存储名称（如 `surprise-blob`）
+   - 点击 "Create"
+   - Vercel 会自动注入 Blob 环境变量到您的项目
+
+4. **配置环境变量（可选）**
 
    在 Vercel 项目设置中添加以下环境变量：
 
    - `ADMIN_KEY`: 管理员密钥（例如：`creator_secret_123`）
    - `PUBLIC_URL`: 留空（Vercel 会自动使用部署域名）
-
-4. **配置 Vercel KV 数据库**
-
-   - 在 Vercel 项目页面，点击 "Storage" 标签
-   - 点击 "Create Database"
-   - 选择 "KV" (Key-Value Store)
-   - 输入数据库名称（如 `surprise-db`）
-   - 点击 "Create"
-   - Vercel 会自动注入 KV 环境变量到您的项目
 
 5. **部署**
    - 点击 "Deploy"
@@ -40,95 +41,33 @@
 
 ---
 
-### 方法二：使用 Vercel CLI 部署
+## 📋 详细配置步骤
 
-1. **安装 Vercel CLI**
-   ```bash
-   npm install -g vercel
-   ```
+### 步骤 1：创建 Blob 存储
 
-2. **登录 Vercel**
-   ```bash
-   vercel login
-   ```
+1. 进入您的 Vercel 项目
+2. 点击顶部的 "Storage" 标签
+3. 点击 "Create Database" 按钮
+4. 选择 "Blob" 选项
+5. 填写存储名称（例如：`surprise-blob`）
+6. 点击 "Create" 按钮
 
-3. **部署**
-   ```bash
-   vercel
-   ```
+### 步骤 2：连接 Blob 到项目
 
-4. **配置环境变量**
-   ```bash
-   vercel env add ADMIN_KEY
-   # 输入您的管理员密钥
-   ```
+创建后，Vercel 会自动将以下环境变量注入到您的项目：
 
-5. **配置 KV 数据库**
-   - 访问 Vercel 控制台
-   - 按照上述方法一的步骤 4 配置
+- `BLOB_READ_WRITE_TOKEN` - 读写权限令牌
 
-6. **重新部署**
-   ```bash
-   vercel --prod
-   ```
+这些变量会自动在部署时可用，无需手动配置。
 
----
+### 步骤 3：重新部署
 
-## 📋 部署前检查清单
+如果您在部署后才创建 Blob 存储：
 
-- ✅ 代码已推送到 GitHub
-- ✅ `vercel.json` 配置文件已创建
-- ✅ `api/` 目录下的 Serverless Functions 已创建
-- ✅ `package.json` 中已添加 `@vercel/kv` 依赖
-- ✅ 构建命令设置为 `npm run build`
-- ✅ 输出目录设置为 `dist`
-
----
-
-## 🔧 Vercel 配置说明
-
-### vercel.json
-
-```json
-{
-  "buildCommand": "npm run build",
-  "outputDirectory": "dist",
-  "rewrites": [
-    {
-      "source": "/api/:path*",
-      "destination": "/api/:path*"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/index.html"
-    }
-  ]
-}
-```
-
-### 环境变量
-
-| 变量名 | 说明 | 示例 |
-|--------|------|------|
-| `ADMIN_KEY` | 管理员密钥 | `creator_secret_123` |
-| `PUBLIC_URL` | 公网地址（可选） | 留空，Vercel 自动处理 |
-| `KV_*` | Vercel KV 变量 | 自动注入 |
-
----
-
-## 📁 项目结构变化
-
-```
-red/
-├── api/                    # Vercel Serverless Functions
-│   ├── image.js           # 图片上传/获取 API
-│   └── server-info.js     # 服务器信息 API
-├── src/                   # React 前端代码
-├── dist/                  # 构建输出（自动生成）
-├── vercel.json            # Vercel 配置
-├── server.ts              # 本地开发服务器（Vercel 不使用）
-└── package.json
-```
+1. 进入 "Deployments" 标签
+2. 点击最新部署右侧的三个点
+3. 选择 "Redeploy"
+4. 确认重新部署
 
 ---
 
@@ -152,12 +91,94 @@ https://your-app.vercel.app?key=creator_secret_123
 
 - 点击"选择并上传照片"
 - 选择图片并上传
+- 照片会自动存储到 Vercel Blob
 - 等待上传完成
 
 ### 4. 分享链接
 
 - 点击"复制分享链接"
 - 分享给任何人（全球可访问）
+- 图片通过 Vercel CDN 加速访问
+
+---
+
+## 📊 Vercel Blob 说明
+
+### 什么是 Blob？
+
+Vercel Blob 是专为文件存储设计的服务：
+
+- ✅ 支持任意文件类型（图片、视频、文档等）
+- ✅ 自动 CDN 加速，全球快速访问
+- ✅ 简单的 API，易于使用
+- ✅ 按需付费，免费额度充足
+
+### 免费额度
+
+Vercel Blob 免费计划包括：
+
+- **存储空间**：1GB
+- **带宽**：100GB/月
+- **请求次数**：无限制
+
+对于红包应用来说，免费额度完全够用！
+
+### 与 KV 的区别
+
+| 特性 | Blob | KV |
+|------|------|-----|
+| 用途 | 文件存储 | 键值对数据 |
+| 适合 | 图片、视频、文档 | 配置、缓存、简单数据 |
+| 大小限制 | 500MB/文件 | 1MB/键 |
+| 访问方式 | URL 直接访问 | API 读取 |
+| CDN | ✅ 自动 | ❌ 需手动 |
+
+**对于我们的红包应用，Blob 是更好的选择！**
+
+---
+
+## 🔧 常见问题
+
+### Q: 为什么我的 Storage 里没有 KV 选项？
+
+**A:** Vercel KV 可能因地区或计划限制不可用。使用 Blob 存储是更好的选择，因为：
+- Blob 专为文件存储设计
+- 自动 CDN 加速
+- 更大的存储空间
+- 更适合图片存储
+
+### Q: 上传的图片存储在哪里？
+
+**A:** 图片存储在 Vercel Blob 中，文件名为 `surprise-image.jpg`。每次上传新图片会自动覆盖旧图片。
+
+### Q: 图片大小有限制吗？
+
+**A:**
+- Vercel Blob 单文件最大 500MB
+- 建议上传的图片不超过 5MB
+- 可以在前端添加图片压缩功能
+
+### Q: 如何查看 Blob 中的文件？
+
+**A:**
+1. 进入 Vercel 项目页面
+2. 点击 "Storage" 标签
+3. 选择您的 Blob 存储
+4. 可以查看所有上传的文件
+
+### Q: 如何删除旧图片？
+
+**A:**
+- 上传新图片会自动覆盖旧图片
+- 也可以在 Vercel Blob 管理界面手动删除
+
+### Q: 部署后无法上传图片？
+
+**A:** 检查以下几点：
+1. Vercel Blob 是否已创建并连接
+2. 环境变量 `BLOB_READ_WRITE_TOKEN` 是否存在
+3. 重新部署项目
+4. 检查浏览器控制台是否有错误
 
 ---
 
@@ -176,10 +197,20 @@ Vercel 会自动监听 GitHub 仓库的变化：
    ```
 3. Vercel 自动构建和部署
 
-### 手动部署
+---
 
-```bash
-vercel --prod
+## 📁 项目结构
+
+```
+red/
+├── api/                    # Vercel Serverless Functions
+│   ├── image.js           # 图片上传/获取 API（使用 Blob）
+│   └── server-info.js     # 服务器信息 API
+├── src/                   # React 前端代码
+├── dist/                  # 构建输出（自动生成）
+├── vercel.json            # Vercel 配置
+├── server.ts              # 本地开发服务器（Vercel 不使用）
+└── package.json
 ```
 
 ---
@@ -189,107 +220,51 @@ vercel --prod
 ### 1. 数据存储
 
 - **本地开发**：使用 SQLite 数据库（`surprise.db`）
-- **Vercel 部署**：使用 Vercel KV（云端 Key-Value 存储）
+- **Vercel 部署**：使用 Vercel Blob（云端文件存储）
 - 两者数据不互通，需要分别管理
 
-### 2. 文件大小限制
+### 2. 图片访问
 
-- Vercel Serverless Functions 有请求体大小限制（默认 4.5MB）
-- 建议上传的图片不超过 2MB
-- 可以在前端添加图片压缩功能
+- Blob 存储的图片有公开 URL
+- 通过 Vercel CDN 全球加速
+- 访问速度快，无需额外配置
 
-### 3. 免费额度
+### 3. 成本控制
 
-Vercel 免费计划包括：
-- ✅ 100GB 带宽/月
-- ✅ 无限部署
-- ✅ 自动 HTTPS
-- ✅ 全球 CDN
-
-Vercel KV 免费计划：
-- ✅ 256MB 存储
-- ✅ 3000 次请求/天
-
-### 4. 自定义域名
-
-在 Vercel 项目设置中可以添加自定义域名：
-1. 进入项目设置
-2. 点击 "Domains"
-3. 添加您的域名
-4. 按照提示配置 DNS
+- 免费额度：1GB 存储 + 100GB 带宽/月
+- 建议压缩图片以节省空间和带宽
+- 超出免费额度会自动计费
 
 ---
 
-## 🐛 常见问题
+## 🎯 最佳实践
 
-### Q: 部署后无法上传图片？
+### 1. 图片优化
 
-**A:** 检查以下几点：
-1. Vercel KV 数据库是否已创建并连接
-2. 环境变量 `ADMIN_KEY` 是否已设置
-3. 图片大小是否超过限制
+在前端添加图片压缩：
 
-### Q: API 返回 404 错误？
+```bash
+npm install browser-image-compression
+```
 
-**A:** 确保：
-1. `api/` 目录下的文件存在
-2. `vercel.json` 配置正确
-3. 重新部署项目
+### 2. 错误处理
 
-### Q: 本地开发和 Vercel 部署如何切换？
+- 上传失败时显示友好提示
+- 添加重试机制
+- 记录错误日志
 
-**A:**
-- **本地开发**：运行 `npm run dev`（使用 SQLite）
-- **Vercel 部署**：自动使用 Vercel KV
-- 代码会自动检测环境
+### 3. 安全性
 
-### Q: 如何查看 Vercel KV 中的数据？
-
-**A:**
-1. 进入 Vercel 项目页面
-2. 点击 "Storage" 标签
-3. 选择您的 KV 数据库
-4. 可以查看和管理存储的数据
-
----
-
-## 📊 性能优化建议
-
-1. **图片压缩**
-   - 在前端添加图片压缩功能
-   - 使用 `browser-image-compression` 库
-
-2. **CDN 加速**
-   - Vercel 自动提供全球 CDN
-   - 静态资源自动缓存
-
-3. **缓存策略**
-   - 设置合适的缓存头
-   - 减少 API 调用次数
-
----
-
-## 🔐 安全建议
-
-1. **保护管理员密钥**
-   - 不要在代码中硬编码
-   - 使用环境变量
-   - 定期更换密钥
-
-2. **HTTPS**
-   - Vercel 自动提供 HTTPS
-   - 强制使用 HTTPS 访问
-
-3. **访问控制**
-   - 考虑添加访问频率限制
-   - 防止恶意上传
+- 保护管理员密钥
+- 使用环境变量
+- 定期更换密钥
 
 ---
 
 ## 📞 获取帮助
 
 - Vercel 文档：[vercel.com/docs](https://vercel.com/docs)
-- Vercel KV 文档：[vercel.com/docs/storage/vercel-kv](https://vercel.com/docs/storage/vercel-kv)
+- Vercel Blob 文档：[vercel.com/docs/storage/vercel-blob](https://vercel.com/docs/storage/vercel-blob)
 - GitHub Issues：提交问题到您的仓库
 
 祝您部署顺利！🎉
