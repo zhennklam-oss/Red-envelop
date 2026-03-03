@@ -1,4 +1,4 @@
-import { put, head } from '@vercel/blob';
+import { put, list } from '@vercel/blob';
 
 export default async function handler(req, res) {
   // 设置 CORS 头
@@ -17,24 +17,19 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      // 尝试获取图片 URL
-      // Blob 存储使用固定的文件名
-      const blobUrl = process.env.SURPRISE_IMAGE_URL;
+      // 列出所有 blob 文件，查找 surprise-image
+      const { blobs } = await list({ prefix: 'surprise-image' });
 
-      if (blobUrl) {
-        // 检查文件是否存在
-        try {
-          await head(blobUrl);
-          res.status(200).json({ image: blobUrl });
-        } catch {
-          res.status(200).json({ image: null });
-        }
+      if (blobs && blobs.length > 0) {
+        // 返回最新的图片 URL
+        const latestBlob = blobs[blobs.length - 1];
+        res.status(200).json({ image: latestBlob.url });
       } else {
         res.status(200).json({ image: null });
       }
     } catch (error) {
       console.error('Error fetching image:', error);
-      res.status(500).json({ error: 'Failed to fetch image' });
+      res.status(200).json({ image: null });
     }
   } else if (req.method === 'POST') {
     try {
@@ -56,14 +51,14 @@ export default async function handler(req, res) {
       // 上传到 Vercel Blob
       const blob = await put('surprise-image.jpg', buffer, {
         access: 'public',
-        addRandomSuffix: false, // 使用固定文件名，方便覆盖
+        addRandomSuffix: false,
       });
 
       // 返回 Blob URL
       res.status(200).json({ success: true, url: blob.url });
     } catch (error) {
       console.error('Error saving image:', error);
-      res.status(500).json({ error: 'Failed to save image' });
+      res.status(500).json({ error: 'Failed to save image', details: error.message });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });
