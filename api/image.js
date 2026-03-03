@@ -48,8 +48,9 @@ export default async function handler(req, res) {
       const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
       const buffer = Buffer.from(base64Data, 'base64');
 
-      // 上传到 Vercel Blob（使用默认访问权限）
+      // 上传到 Vercel Blob
       const blob = await put('surprise-image.jpg', buffer, {
+        access: 'public',
         addRandomSuffix: false,
       });
 
