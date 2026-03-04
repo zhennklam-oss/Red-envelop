@@ -5,25 +5,28 @@
 
 import React, { useState, useRef, useEffect } from 'react';
 import { motion, AnimatePresence } from 'motion/react';
-import { Upload, X, Heart, Sparkles, Image as ImageIcon, Loader2, AlertCircle } from 'lucide-react';
+import { Upload, X, Heart, Sparkles, Image as ImageIcon, Loader2, AlertCircle, Music } from 'lucide-react';
 
 const ADMIN_KEY = "creator_secret_123";
 
 export default function App() {
   const [photo, setPhoto] = useState<string | null>(null);
+  const [music, setMusic] = useState<string | null>(null);
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
   const fileInputRef = useRef<HTMLInputElement>(null);
+  const musicInputRef = useRef<HTMLInputElement>(null);
+  const audioRef = useRef<HTMLAudioElement>(null);
 
   // Check if current user is the creator based on URL key
   const searchParams = new URLSearchParams(window.location.search);
   const isCreator = searchParams.get('key') === ADMIN_KEY;
 
   useEffect(() => {
-    fetchImage();
+    fetchData();
     fetchServerInfo();
   }, []);
 
@@ -37,7 +40,7 @@ export default function App() {
     }
   };
 
-  const fetchImage = async () => {
+  const fetchData = async () => {
     try {
       setIsLoading(true);
       const res = await fetch('/api/image');
@@ -45,8 +48,11 @@ export default function App() {
       if (data.image) {
         setPhoto(data.image);
       }
+      if (data.music) {
+        setMusic(data.music);
+      }
     } catch (err) {
-      console.error("Failed to fetch image:", err);
+      console.error("Failed to fetch data:", err);
       setError("无法加载惊喜内容，请稍后再试。");
     } finally {
       setIsLoading(false);
@@ -59,23 +65,47 @@ export default function App() {
       const reader = new FileReader();
       reader.onloadend = async () => {
         const base64 = reader.result as string;
-        await saveImage(base64);
+        await saveData(base64, music);
       };
       reader.readAsDataURL(file);
     }
   };
 
-  const saveImage = async (base64: string) => {
+  const handleMusicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      // 检查文件类型
+      const validTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/webm'];
+      if (!validTypes.includes(file.type) && !file.name.match(/\.(wav|mp3|ogg|webm)$/i)) {
+        alert('请上传音频文件（支持 WAV、MP3、OGG、WEBM 格式）');
+        return;
+      }
+
+      const reader = new FileReader();
+      reader.onloadend = async () => {
+        const base64 = reader.result as string;
+        await saveData(photo, base64);
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const saveData = async (imageData: string | null, musicData: string | null) => {
     try {
       setIsSaving(true);
       const res = await fetch('/api/image', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ image: base64, key: ADMIN_KEY })
+        body: JSON.stringify({
+          image: imageData || photo,
+          music: musicData || music,
+          key: ADMIN_KEY
+        })
       });
-      
+
       if (res.ok) {
-        setPhoto(base64);
+        if (imageData) setPhoto(imageData);
+        if (musicData) setMusic(musicData);
         setIsOpen(false);
       } else {
         const data = await res.json();
@@ -90,15 +120,22 @@ export default function App() {
   };
 
   const reset = async () => {
-    if (confirm("确定要删除当前照片吗？")) {
-      await saveImage(""); // Send empty to clear (or modify server to handle delete)
+    if (confirm("确定要删除当前内容吗？")) {
+      await saveData("", "");
       setPhoto(null);
+      setMusic(null);
     }
   };
 
   const toggleEnvelope = () => {
     if (photo) {
       setIsOpen(!isOpen);
+      // 打开红包时播放音乐
+      if (!isOpen && music && audioRef.current) {
+        audioRef.current.play().catch(err => {
+          console.error("音乐播放失败:", err);
+        });
+      }
     }
   };
 
@@ -136,21 +173,40 @@ export default function App() {
             <h1 className="text-3xl font-bold text-gray-900 mb-2 tracking-tight">
               {isSaving ? "正在保存..." : "设置你的红包惊喜"}
             </h1>
-            <p className="text-gray-500 mb-8">作为制作者，请上传一张照片。分享链接后，其他人将只能看到红包并开启它。</p>
-            
-            <button
-              disabled={isSaving}
-              onClick={() => fileInputRef.current?.click()}
-              className="w-full bg-[#FF6321] hover:bg-[#E5591E] disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#FF6321]/20"
-            >
-              <Upload className="w-5 h-5" />
-              选择并上传照片
-            </button>
+            <p className="text-gray-500 mb-8">作为制作者，请上传照片和音乐。分享链接后，其他人将只能看到红包并开启它。</p>
+
+            <div className="space-y-4">
+              <button
+                disabled={isSaving}
+                onClick={() => fileInputRef.current?.click()}
+                className="w-full bg-[#FF6321] hover:bg-[#E5591E] disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#FF6321]/20"
+              >
+                <Upload className="w-5 h-5" />
+                选择并上传照片
+              </button>
+
+              <button
+                disabled={isSaving}
+                onClick={() => musicInputRef.current?.click()}
+                className="w-full bg-[#D4AF37] hover:bg-[#B8860B] disabled:bg-gray-400 text-white font-semibold py-4 px-6 rounded-2xl transition-all flex items-center justify-center gap-2 shadow-lg shadow-[#D4AF37]/20"
+              >
+                <Music className="w-5 h-5" />
+                {music ? "更换背景音乐" : "上传背景音乐（可选）"}
+              </button>
+            </div>
+
             <input
               type="file"
               ref={fileInputRef}
               onChange={handleFileChange}
               accept="image/*"
+              className="hidden"
+            />
+            <input
+              type="file"
+              ref={musicInputRef}
+              onChange={handleMusicChange}
+              accept="audio/*,.wav,.mp3,.ogg,.webm"
               className="hidden"
             />
           </motion.div>
@@ -179,7 +235,7 @@ export default function App() {
 
                 <div className="z-10 text-center">
                   <h2 className="text-white text-4xl font-serif italic font-bold tracking-widest">福</h2>
-                  <p className="text-[#FFD700] text-sm mt-2 font-medium tracking-widest uppercase opacity-80">Gifts of Joy</p>
+                  <p className="text-[#FFD700] text-sm mt-2 font-medium tracking-widest uppercase opacity-80">杨汉先生给你发红包啦！</p>
                 </div>
 
                 {/* The Seal Button */}
@@ -193,7 +249,7 @@ export default function App() {
                   </motion.div>
                 )}
 
-                <div className="z-10 text-[#FFD700]/60 text-xs font-mono">2026 PROSPERITY</div>
+                <div className="z-10 text-[#FFD700]/60 text-xs font-mono">2026 牛牛马马</div>
               </motion.div>
 
               {/* The Photo (Revealed) */}
@@ -238,7 +294,14 @@ export default function App() {
                     className="px-6 py-2 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm font-medium"
                   >
                     <X className="w-4 h-4" />
-                    更换照片
+                    更换内容
+                  </button>
+                  <button
+                    onClick={() => musicInputRef.current?.click()}
+                    className="px-6 py-2 rounded-full border border-gray-300 text-gray-500 hover:bg-gray-100 transition-colors flex items-center gap-2 text-sm font-medium"
+                  >
+                    <Music className="w-4 h-4" />
+                    {music ? "更换音乐" : "添加音乐"}
                   </button>
                   <button
                     onClick={() => {
@@ -252,7 +315,7 @@ export default function App() {
                     复制分享链接
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 italic">当前处于制作者模式，普通用户访问时不会看到这些按钮</p>
+                <p className="text-xs text-gray-400 italic">制作者模式</p>
               </motion.div>
             )}
           </motion.div>
@@ -292,6 +355,11 @@ export default function App() {
           />
         ))}
       </div>
+
+      {/* Hidden Audio Element */}
+      {music && (
+        <audio ref={audioRef} src={music} loop />
+      )}
     </div>
   );
 }

@@ -17,48 +17,73 @@ export default async function handler(req, res) {
 
   if (req.method === 'GET') {
     try {
-      // 列出所有 blob 文件，查找 surprise-image
-      const { blobs } = await list({ prefix: 'surprise-image' });
+      // 列出所有 blob 文件
+      const { blobs } = await list();
 
-      if (blobs && blobs.length > 0) {
-        // 返回最新的图片 URL
-        const latestBlob = blobs[blobs.length - 1];
-        res.status(200).json({ image: latestBlob.url });
-      } else {
-        res.status(200).json({ image: null });
+      let imageUrl = null;
+      let musicUrl = null;
+
+      // 查找图片和音乐文件
+      for (const blob of blobs) {
+        if (blob.pathname.startsWith('surprise-image')) {
+          imageUrl = blob.url;
+        } else if (blob.pathname.startsWith('surprise-music')) {
+          musicUrl = blob.url;
+        }
       }
+
+      res.status(200).json({ image: imageUrl, music: musicUrl });
     } catch (error) {
-      console.error('Error fetching image:', error);
-      res.status(200).json({ image: null });
+      console.error('Error fetching data:', error);
+      res.status(200).json({ image: null, music: null });
     }
   } else if (req.method === 'POST') {
     try {
-      const { image, key } = req.body;
+      const { image, music, key } = req.body;
 
       // 验证管理员密钥
       if (key !== process.env.ADMIN_KEY && key !== 'creator_secret_123') {
         return res.status(403).json({ error: 'Unauthorized' });
       }
 
-      if (!image) {
-        return res.status(400).json({ error: 'No image provided' });
+      const result = { success: true };
+
+      // 上传图片
+      if (image) {
+        const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
+
+        const blob = await put('surprise-image.jpg', buffer, {
+          access: 'public',
+          addRandomSuffix: false,
+        });
+
+        result.imageUrl = blob.url;
       }
 
-      // 将 base64 转换为 Buffer
-      const base64Data = image.replace(/^data:image\/\w+;base64,/, '');
-      const buffer = Buffer.from(base64Data, 'base64');
+      // 上传音乐
+      if (music) {
+        const base64Data = music.replace(/^data:audio\/\w+;base64,/, '');
+        const buffer = Buffer.from(base64Data, 'base64');
 
-      // 上传到 Vercel Blob
-      const blob = await put('surprise-image.jpg', buffer, {
-        access: 'public',
-        addRandomSuffix: false,
-      });
+        // 检测音频格式
+        let extension = 'mp3';
+        if (music.includes('audio/wav')) extension = 'wav';
+        else if (music.includes('audio/ogg')) extension = 'ogg';
+        else if (music.includes('audio/webm')) extension = 'webm';
 
-      // 返回 Blob URL
-      res.status(200).json({ success: true, url: blob.url });
+        const blob = await put(`surprise-music.${extension}`, buffer, {
+          access: 'public',
+          addRandomSuffix: false,
+        });
+
+        result.musicUrl = blob.url;
+      }
+
+      res.status(200).json(result);
     } catch (error) {
-      console.error('Error saving image:', error);
-      res.status(500).json({ error: 'Failed to save image', details: error.message });
+      console.error('Error saving data:', error);
+      res.status(500).json({ error: 'Failed to save data', details: error.message });
     }
   } else {
     res.status(405).json({ error: 'Method not allowed' });

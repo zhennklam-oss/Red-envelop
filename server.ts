@@ -53,28 +53,24 @@ async function startServer() {
     });
   });
 
-  // API to get the current surprise image
+  // API to get the current surprise image and music
   app.get("/api/image", (req, res) => {
-    const row = db.prepare("SELECT data FROM images ORDER BY id DESC LIMIT 1").get() as { data: string } | undefined;
-    res.json({ image: row?.data || null });
+    const row = db.prepare("SELECT data, music FROM images ORDER BY id DESC LIMIT 1").get() as { data: string; music?: string } | undefined;
+    res.json({ image: row?.data || null, music: row?.music || null });
   });
 
-  // API to save a new surprise image (only if admin key matches)
+  // API to save a new surprise image and music (only if admin key matches)
   app.post("/api/image", (req, res) => {
-    const { image, key } = req.body;
+    const { image, music, key } = req.body;
     // Simple admin key check
     if (key !== "creator_secret_123") {
       return res.status(403).json({ error: "Unauthorized" });
     }
-    
-    if (!image) {
-      return res.status(400).json({ error: "No image provided" });
-    }
 
-    // Replace the existing image or add new one
+    // Replace the existing data or add new one
     db.prepare("DELETE FROM images").run();
-    db.prepare("INSERT INTO images (data) VALUES (?)").run(image);
-    
+    db.prepare("INSERT INTO images (data, music) VALUES (?, ?)").run(image || "", music || "");
+
     res.json({ success: true });
   });
 
