@@ -15,19 +15,14 @@ export default function App() {
   const [isOpen, setIsOpen] = useState(false);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
-  const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
-  const [animationStage, setAnimationStage] = useState<'initial' | 'pause' | 'expand' | 'floating'>('initial');
-  const [photoPosition, setPhotoPosition] = useState({ x: 0, y: 0 });
-  const [photoVelocity, setPhotoVelocity] = useState({ vx: 3, vy: 2 });
-  const [photoRotation, setPhotoRotation] = useState(0);
+  const [animationStage, setAnimationStage] = useState<'initial' | 'pause' | 'expand' | 'explode'>('initial');
+  const [fragments, setFragments] = useState<Array<{ x: number; y: number; rotation: number }>>([]);
 
   const fileInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
-  const animationFrameRef = useRef<number>();
 
-  // Check if current user is the creator based on URL key
   const searchParams = new URLSearchParams(window.location.search);
   const isCreator = searchParams.get('key') === ADMIN_KEY;
 
@@ -51,15 +46,10 @@ export default function App() {
       setIsLoading(true);
       const res = await fetch('/api/image');
       const data = await res.json();
-      if (data.image) {
-        setPhoto(data.image);
-      }
-      if (data.music) {
-        setMusic(data.music);
-      }
+      if (data.image) setPhoto(data.image);
+      if (data.music) setMusic(data.music);
     } catch (err) {
       console.error("Failed to fetch data:", err);
-      setError("无法加载惊喜内容，请稍后再试。");
     } finally {
       setIsLoading(false);
     }
@@ -70,8 +60,7 @@ export default function App() {
     if (file) {
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        await saveData(base64, music);
+        await saveData(reader.result as string, music);
       };
       reader.readAsDataURL(file);
     }
@@ -80,17 +69,14 @@ export default function App() {
   const handleMusicChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
     if (file) {
-      // 检查文件类型
       const validTypes = ['audio/wav', 'audio/mpeg', 'audio/mp3', 'audio/ogg', 'audio/webm'];
       if (!validTypes.includes(file.type) && !file.name.match(/\.(wav|mp3|ogg|webm)$/i)) {
         alert('请上传音频文件（支持 WAV、MP3、OGG、WEBM 格式）');
         return;
       }
-
       const reader = new FileReader();
       reader.onloadend = async () => {
-        const base64 = reader.result as string;
-        await saveData(photo, base64);
+        await saveData(photo, reader.result as string);
       };
       reader.readAsDataURL(file);
     }
@@ -138,83 +124,25 @@ export default function App() {
       setIsOpen(true);
       setAnimationStage('initial');
 
-      // 播放音乐
       if (music && audioRef.current) {
-        audioRef.current.play().catch(err => {
-          console.error("音乐播放失败:", err);
-        });
+        audioRef.current.play().catch(err => console.error("音乐播放失败:", err));
       }
 
-      // 动画序列
-      // 1. 停留3秒
+      // 动画序列：停留3秒 -> 放大2秒 -> 爆炸
+      setTimeout(() => setAnimationStage('pause'), 100);
+      setTimeout(() => setAnimationStage('expand'), 3100);
       setTimeout(() => {
-        setAnimationStage('pause');
-      }, 100);
-
-      // 2. 3秒后开始放大
-      setTimeout(() => {
-        setAnimationStage('expand');
-      }, 3100);
-
-      // 3. 放大动画2秒后开始漂浮
-      setTimeout(() => {
-        setAnimationStage('floating');
-        startFloatingAnimation();
+        setAnimationStage('explode');
+        // 生成碎片
+        const newFragments = Array.from({ length: 20 }, () => ({
+          x: (Math.random() - 0.5) * 800,
+          y: (Math.random() - 0.5) * 800,
+          rotation: Math.random() * 720
+        }));
+        setFragments(newFragments);
       }, 5100);
     }
   };
-
-  // 漂浮动画 - 碰撞检测和反弹
-  const startFloatingAnimation = () => {
-    const photoSize = 200; // 照片大小
-    let x = photoPosition.x;
-    let y = photoPosition.y;
-    let vx = Math.random() * 4 + 2; // 随机速度 2-6
-    let vy = Math.random() * 4 + 2;
-    let rotation = 0;
-    let rotationSpeed = (Math.random() - 0.5) * 3; // 随机旋转速度
-
-    const animate = () => {
-      const windowWidth = window.innerWidth;
-      const windowHeight = window.innerHeight;
-
-      // 更新位置
-      x += vx;
-      y += vy;
-      rotation += rotationSpeed;
-
-      // 边界检测和反弹
-      if (x <= 0 || x >= windowWidth - photoSize) {
-        vx = -vx;
-        rotationSpeed = (Math.random() - 0.5) * 3; // 碰撞时改变旋转方向
-      }
-      if (y <= 0 || y >= windowHeight - photoSize) {
-        vy = -vy;
-        rotationSpeed = (Math.random() - 0.5) * 3;
-      }
-
-      // 确保不超出边界
-      x = Math.max(0, Math.min(x, windowWidth - photoSize));
-      y = Math.max(0, Math.min(y, windowHeight - photoSize));
-
-      setPhotoPosition({ x, y });
-      setPhotoVelocity({ vx, vy });
-      setPhotoRotation(rotation);
-
-      animationFrameRef.current = requestAnimationFrame(animate);
-    };
-
-    animate();
-  };
-
-  // 清理动画
-  useEffect(() => {
-    return () => {
-      if (animationFrameRef.current) {
-        cancelAnimationFrame(animationFrameRef.current);
-      }
-    };
-  }, []);
 
   if (isLoading) {
     return (
@@ -233,7 +161,7 @@ export default function App() {
       </div>
 
       <AnimatePresence mode="wait">
-        {/* Creator Setup View (Only if key matches and no photo yet, or explicitly in edit mode) */}
+        {/* Creator Setup View */}
         {isCreator && (!photo || isSaving) ? (
           <motion.div
             key="setup"
@@ -297,7 +225,7 @@ export default function App() {
 
                 <div className="z-10 text-center">
                   <h2 className="text-white text-4xl font-serif italic font-bold tracking-widest">福</h2>
-                  <p className="text-[#FFD700] text-sm mt-2 font-medium tracking-widest uppercase opacity-80">杨汉先生给你发红包啦！</p>
+                  <p className="text-[#FFD700] text-sm mt-2 font-medium tracking-widest uppercase opacity-80">Gifts of Joy</p>
                 </div>
 
                 {/* The Seal Button */}
@@ -311,20 +239,29 @@ export default function App() {
                   </motion.div>
                 )}
 
-                <div className="z-10 text-[#FFD700]/60 text-xs font-mono">2026 牛牛马马</div>
+                {/* BOOM Text */}
+                {animationStage === 'explode' && (
+                  <motion.div
+                    initial={{ scale: 0, opacity: 0 }}
+                    animate={{ scale: 1, opacity: 1 }}
+                    className="absolute inset-0 flex items-center justify-center z-40"
+                  >
+                    <h1 className="text-8xl font-black text-[#FFD700] drop-shadow-2xl">BOOM!</h1>
+                  </motion.div>
+                )}
+
+                <div className="z-10 text-[#FFD700]/60 text-xs font-mono">2026 PROSPERITY</div>
               </motion.div>
 
-              {/* The Photo (Revealed) */}
+              {/* The Photo (Before Explosion) */}
               <AnimatePresence>
-                {isOpen && animationStage !== 'floating' && (
+                {isOpen && animationStage !== 'explode' && (
                   <motion.div
                     initial={{ y: 50, opacity: 0, scale: 0.5 }}
                     animate={
                       animationStage === 'initial' || animationStage === 'pause'
                         ? { y: -50, opacity: 1, scale: 1.1 }
-                        : animationStage === 'expand'
-                        ? { scale: 5, opacity: 1 }
-                        : {}
+                        : { scale: 5, opacity: 1 }
                     }
                     transition={
                       animationStage === 'expand'
@@ -351,34 +288,35 @@ export default function App() {
                   </motion.div>
                 )}
               </AnimatePresence>
-            </div>
 
-            {/* Floating Photo - 全屏漂浮 */}
-            {isOpen && animationStage === 'floating' && !isCreator && (
-              <motion.div
-                className="fixed z-50 pointer-events-none"
-                style={{
-                  left: photoPosition.x,
-                  top: photoPosition.y,
-                  rotate: photoRotation,
-                }}
-                initial={{ scale: 5 }}
-                animate={{ scale: 1 }}
-                transition={{ duration: 1, ease: "easeOut" }}
-              >
-                <div className="relative p-2 bg-white rounded-xl shadow-2xl">
-                  <img
-                    src={photo}
-                    alt="Surprise"
-                    className="w-48 h-60 object-cover rounded-lg"
-                    referrerPolicy="no-referrer"
-                  />
-                  <div className="absolute -top-3 -right-3 bg-[#FF6321] text-white p-2 rounded-full shadow-lg">
-                    <Heart className="w-5 h-5 fill-current" />
+              {/* Explosion Fragments */}
+              {animationStage === 'explode' && fragments.map((frag, i) => (
+                <motion.div
+                  key={i}
+                  className="absolute top-1/2 left-1/2 z-20"
+                  initial={{ x: 0, y: 0, opacity: 1, scale: 1 }}
+                  animate={{
+                    x: frag.x,
+                    y: frag.y,
+                    opacity: 0,
+                    scale: 0.3,
+                    rotate: frag.rotation
+                  }}
+                  transition={{ duration: 1.5, ease: "easeOut" }}
+                >
+                  <div className="w-12 h-12 bg-white rounded shadow-lg overflow-hidden">
+                    <img
+                      src={photo!}
+                      alt=""
+                      className="w-full h-full object-cover"
+                      style={{
+                        objectPosition: `${(i % 5) * 25}% ${Math.floor(i / 5) * 25}%`
+                      }}
+                    />
                   </div>
-                </div>
-              </motion.div>
-            )}
+                </motion.div>
+              ))}
+            </div>
 
             {/* Creator Controls */}
             {isCreator && (
@@ -407,7 +345,7 @@ export default function App() {
                     onClick={() => {
                       const publicUrl = shareUrl || window.location.origin;
                       navigator.clipboard.writeText(publicUrl);
-                      alert(`分享链接已复制到剪贴板！\n\n${publicUrl}\n\n发送给同一局域网内的好友即可打开红包。`);
+                      alert(`分享链接已复制到剪贴板！\n\n${publicUrl}\n\n发送给好友即可打开红包。`);
                     }}
                     className="px-6 py-2 rounded-full bg-emerald-600 text-white hover:bg-emerald-700 transition-colors flex items-center gap-2 text-sm font-medium shadow-lg"
                   >
@@ -415,7 +353,7 @@ export default function App() {
                     复制分享链接
                   </button>
                 </div>
-                <p className="text-xs text-gray-400 italic">制作者模式</p>
+                <p className="text-xs text-gray-400 italic">当前处于制作者模式</p>
               </motion.div>
             )}
           </motion.div>
@@ -433,7 +371,7 @@ export default function App() {
         )}
       </AnimatePresence>
 
-      {/* Floating Particles (Decorative) */}
+      {/* Floating Particles */}
       <div className="fixed inset-0 pointer-events-none z-0">
         {[...Array(12)].map((_, i) => (
           <motion.div
@@ -457,11 +395,9 @@ export default function App() {
       </div>
 
       {/* Hidden Audio Element */}
-      {music && (
-        <audio ref={audioRef} src={music} loop />
-      )}
+      {music && <audio ref={audioRef} src={music} loop />}
 
-      {/* Hidden File Inputs - 放在最外层，所有界面都可以使用 */}
+      {/* Hidden File Inputs */}
       <input
         type="file"
         ref={fileInputRef}
