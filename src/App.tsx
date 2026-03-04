@@ -17,9 +17,15 @@ export default function App() {
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [shareUrl, setShareUrl] = useState<string>('');
+  const [animationStage, setAnimationStage] = useState<'initial' | 'pause' | 'expand' | 'floating'>('initial');
+  const [photoPosition, setPhotoPosition] = useState({ x: 0, y: 0 });
+  const [photoVelocity, setPhotoVelocity] = useState({ vx: 3, vy: 2 });
+  const [photoRotation, setPhotoRotation] = useState(0);
+
   const fileInputRef = useRef<HTMLInputElement>(null);
   const musicInputRef = useRef<HTMLInputElement>(null);
   const audioRef = useRef<HTMLAudioElement>(null);
+  const animationFrameRef = useRef<number>();
 
   // Check if current user is the creator based on URL key
   const searchParams = new URLSearchParams(window.location.search);
@@ -128,16 +134,87 @@ export default function App() {
   };
 
   const toggleEnvelope = () => {
-    if (photo) {
-      setIsOpen(!isOpen);
-      // 打开红包时播放音乐
-      if (!isOpen && music && audioRef.current) {
+    if (photo && !isOpen) {
+      setIsOpen(true);
+      setAnimationStage('initial');
+
+      // 播放音乐
+      if (music && audioRef.current) {
         audioRef.current.play().catch(err => {
           console.error("音乐播放失败:", err);
         });
       }
+
+      // 动画序列
+      // 1. 停留3秒
+      setTimeout(() => {
+        setAnimationStage('pause');
+      }, 100);
+
+      // 2. 3秒后开始放大
+      setTimeout(() => {
+        setAnimationStage('expand');
+      }, 3100);
+
+      // 3. 放大动画2秒后开始漂浮
+      setTimeout(() => {
+        setAnimationStage('floating');
+        startFloatingAnimation();
+      }, 5100);
     }
   };
+
+  // 漂浮动画 - 碰撞检测和反弹
+  const startFloatingAnimation = () => {
+    const photoSize = 200; // 照片大小
+    let x = photoPosition.x;
+    let y = photoPosition.y;
+    let vx = Math.random() * 4 + 2; // 随机速度 2-6
+    let vy = Math.random() * 4 + 2;
+    let rotation = 0;
+    let rotationSpeed = (Math.random() - 0.5) * 3; // 随机旋转速度
+
+    const animate = () => {
+      const windowWidth = window.innerWidth;
+      const windowHeight = window.innerHeight;
+
+      // 更新位置
+      x += vx;
+      y += vy;
+      rotation += rotationSpeed;
+
+      // 边界检测和反弹
+      if (x <= 0 || x >= windowWidth - photoSize) {
+        vx = -vx;
+        rotationSpeed = (Math.random() - 0.5) * 3; // 碰撞时改变旋转方向
+      }
+      if (y <= 0 || y >= windowHeight - photoSize) {
+        vy = -vy;
+        rotationSpeed = (Math.random() - 0.5) * 3;
+      }
+
+      // 确保不超出边界
+      x = Math.max(0, Math.min(x, windowWidth - photoSize));
+      y = Math.max(0, Math.min(y, windowHeight - photoSize));
+
+      setPhotoPosition({ x, y });
+      setPhotoVelocity({ vx, vy });
+      setPhotoRotation(rotation);
+
+      animationFrameRef.current = requestAnimationFrame(animate);
+    };
+
+    animate();
+  };
+
+  // 清理动画
+  useEffect(() => {
+    return () => {
+      if (animationFrameRef.current) {
+        cancelAnimationFrame(animationFrameRef.current);
+      }
+    };
+  }, []);
 
   if (isLoading) {
     return (
@@ -239,10 +316,21 @@ export default function App() {
 
               {/* The Photo (Revealed) */}
               <AnimatePresence>
-                {isOpen && (
+                {isOpen && animationStage !== 'floating' && (
                   <motion.div
                     initial={{ y: 50, opacity: 0, scale: 0.5 }}
-                    animate={{ y: -50, opacity: 1, scale: 1.1 }}
+                    animate={
+                      animationStage === 'initial' || animationStage === 'pause'
+                        ? { y: -50, opacity: 1, scale: 1.1 }
+                        : animationStage === 'expand'
+                        ? { scale: 5, opacity: 1 }
+                        : {}
+                    }
+                    transition={
+                      animationStage === 'expand'
+                        ? { duration: 2, ease: "easeInOut" }
+                        : { type: "spring", stiffness: 100, damping: 20 }
+                    }
                     className="absolute inset-0 flex items-center justify-center z-30"
                   >
                     <div className="relative p-2 bg-white rounded-xl shadow-2xl rotate-3">
@@ -264,6 +352,33 @@ export default function App() {
                 )}
               </AnimatePresence>
             </div>
+
+            {/* Floating Photo - 全屏漂浮 */}
+            {isOpen && animationStage === 'floating' && !isCreator && (
+              <motion.div
+                className="fixed z-50 pointer-events-none"
+                style={{
+                  left: photoPosition.x,
+                  top: photoPosition.y,
+                  rotate: photoRotation,
+                }}
+                initial={{ scale: 5 }}
+                animate={{ scale: 1 }}
+                transition={{ duration: 1, ease: "easeOut" }}
+              >
+                <div className="relative p-2 bg-white rounded-xl shadow-2xl">
+                  <img
+                    src={photo}
+                    alt="Surprise"
+                    className="w-48 h-60 object-cover rounded-lg"
+                    referrerPolicy="no-referrer"
+                  />
+                  <div className="absolute -top-3 -right-3 bg-[#FF6321] text-white p-2 rounded-full shadow-lg">
+                    <Heart className="w-5 h-5 fill-current" />
+                  </div>
+                </div>
+              </motion.div>
+            )}
 
             {/* Creator Controls */}
             {isCreator && (
