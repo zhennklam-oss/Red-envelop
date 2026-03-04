@@ -194,21 +194,6 @@ export default function App() {
                 {music ? "更换背景音乐" : "上传背景音乐（可选）"}
               </button>
             </div>
-
-            <input
-              type="file"
-              ref={fileInputRef}
-              onChange={handleFileChange}
-              accept="image/*"
-              className="hidden"
-            />
-            <input
-              type="file"
-              ref={musicInputRef}
-              onChange={handleMusicChange}
-              accept="audio/*,.wav,.mp3,.ogg,.webm"
-              className="hidden"
-            />
           </motion.div>
         ) : photo ? (
           <motion.div
@@ -360,6 +345,22 @@ export default function App() {
       {music && (
         <audio ref={audioRef} src={music} loop />
       )}
+
+      {/* Hidden File Inputs - 放在最外层，所有界面都可以使用 */}
+      <input
+        type="file"
+        ref={fileInputRef}
+        onChange={handleFileChange}
+        accept="image/*"
+        className="hidden"
+      />
+      <input
+        type="file"
+        ref={musicInputRef}
+        onChange={handleMusicChange}
+        accept="audio/*,.wav,.mp3,.ogg,.webm"
+        className="hidden"
+      />
     </div>
   );
 }
